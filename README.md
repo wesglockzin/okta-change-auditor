@@ -28,3 +28,12 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ## Stack
 Python 3 · Flask · gunicorn · Pico CSS. A `Dockerfile` is included (port 8080, non-root).
+
+## Known limitations
+- **Bounded by the System Log.** Okta keeps roughly 90 days of System Log history, so
+  older changes simply aren't there.
+- **Noise filtering is heuristic.** "Routine" events are hidden by event-type and actor
+  rules; an unusual change made through an automated path can be hidden until you toggle
+  "show everything".
+- **The sign-in gate is off when OIDC isn't configured** — local development only.
+- **No automated tests.**
