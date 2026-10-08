@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store">
+    <title>Okta Change Auditor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"/>
+    <style>
+        :root { font-size: 87.5%; }
+        body { margin: 0; }
+        main.container { max-width: 1600px; }
+
+        .top-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 0.75rem;
+            padding: 0.9rem 0 0.75rem; margin-bottom: 0.75rem;
+            border-bottom: 1px solid var(--pico-muted-border-color);
+        }
+        .top-bar hgroup { margin: 0; }
+        .top-bar hgroup h2 { margin: 0; font-size: 1.15em; }
+        .top-bar hgroup p  { margin: 0; color: var(--pico-muted-color); font-size: 0.82em; }
+
+        .env-bar { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+        .env-btn {
+            padding: 0.2rem 0.75rem; font-size: 0.82em; border-radius: 999px;
+            border: 1px solid #bbb; background: #f0f0f0; cursor: pointer;
+            color: #333 !important; transition: background 0.15s;
+        }
+        .env-btn.active { background: #1b6ca8 !important; border-color: #1b6ca8 !important; color: #fff !important; font-weight: 600; }
+        .env-btn.env-prod.active { background: #b71c1c !important; border-color: #b71c1c !important; }
+        .env-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+        .filter-bar {
+            display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+            margin-bottom: 0.5rem;
+        }
+        .filter-btn {
+            padding: 0.15rem 0.65rem; font-size: 0.82em; border-radius: 999px;
+            border: 1px solid #bbb; background: #f0f0f0; cursor: pointer;
+            color: #333 !important; transition: background 0.15s;
+        }
+        .filter-btn.active-filter {
+            background: #1b6ca8 !important; border-color: #1b6ca8 !important;
+            color: #fff !important; font-weight: 600;
+        }
+        .column-filter {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            font-size: 0.8em; color: var(--pico-muted-color);
+        }
+        .column-filter select {
+            margin: 0; width: auto; max-width: 280px;
+            padding: 0.2rem 1.6rem 0.2rem 0.5rem; font-size: 0.95em;
+        }
+        .range-bar {
+            display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+        }
+        .range-bar label { font-size: 0.82em; color: var(--pico-muted-color); margin: 0; }
+        .range-bar select, .range-bar input[type="datetime-local"] {
+            margin: 0; padding: 0.2rem 0.5rem; font-size: 0.85em; width: auto;
+        }
+        .range-bar input[type="datetime-local"] { min-width: 12rem; }
+        .flag-bar {
+            display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+            font-size: 0.85em;
+            margin: 0.6rem 0 0.4rem 0;
+        }
+        .flag-bar > .flag-bar-label {
+            color: var(--pico-muted-color); font-size: 0.82em;
+            margin-right: 0.25rem;
+        }
+        .flag-btn {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.25rem 0.85rem; font-size: 0.85em;
+            border-radius: 999px; cursor: pointer; user-select: none;
+            border: 1px solid #bbb; background: #f0f0f0; color: #333 !important;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+            margin: 0;
+        }
+        .flag-btn:hover { background: #e6e6e6; }
+        .flag-btn[aria-pressed="true"] {
+            background: #1b6ca8 !important; border-color: #1b6ca8 !important;
+            color: #fff !important; font-weight: 600;
+        }
+        .flag-btn[aria-pressed="true"]:hover { background: #155a8c !important; }
+        .flag-btn .flag-state {
+            font-size: 0.78em; opacity: 0.85; font-weight: 500;
+        }
+        .flag-btn[aria-pressed="false"] .flag-state { color: #888; }
+        .flag-btn .flag-count {
+            font-variant-numeric: tabular-nums; font-size: 0.85em; opacity: 0.95;
+        }
+        .pill.pill-truncated {
+            background: #fff8e1; border-color: #ffe082; color: #5f4200; cursor: help;
+        }
+        .when-span {
+            color: var(--pico-muted-color); font-size: 0.92em; margin-left: 0.4rem;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pill-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .pill {
+            display: inline-flex; align-items: center;
+            padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.8em;
+            border: 1px solid var(--pico-muted-border-color);
+            background: var(--pico-muted-background-color);
+        }
+        .pill-create   { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+        .pill-update   { background: #e3f0fc; border-color: #90caf9; color: #0d47a1; }
+        .pill-delete   { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
+        .pill-policy   { background: #f3e5f5; border-color: #ce93d8; color: #4a148c; }
+        .pill-other    { background: #eceff1; border-color: #b0bec5; color: #37474f; }
+
+        #change-table { font-size: 0.86em; margin: 0; }
+        #change-table th { white-space: nowrap; position: sticky; top: 0; background: var(--pico-background-color); z-index: 1; }
+        #change-table td { vertical-align: top; }
+        #change-table td.col-when  { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--pico-muted-color); }
+        #change-table td.col-who   { white-space: nowrap; }
+        #change-table td.col-what  { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.92em; }
+        #change-table tbody tr.change-row { cursor: pointer; }
+        #change-table tbody tr.change-row:hover { background: #f6fbff; }
+        #change-table tbody tr.change-row.selected { background: #eef7ff; }
+        .expand-caret {
+            display: inline-block; width: 0.85rem; text-align: center;
+            color: var(--pico-muted-color); margin-right: 0.35rem;
+            transition: transform 0.15s ease;
+        }
+        #change-table tbody tr.change-row:hover .expand-caret { color: #1b6ca8; }
+        #change-table tbody tr.change-row.selected .expand-caret { transform: rotate(90deg); color: #1b6ca8; }
+        .event-label { font-weight: 500; }
+        .event-type-raw {
+            display: block; margin-top: 0.15rem;
+            color: var(--pico-muted-color); font-size: 0.75em;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        }
+        #change-table tbody tr.raw-row td { padding: 0 0 0.75rem 0; border-top: 0; background: #f8fafc; }
+        .raw-drawer {
+            margin: 0 0 0.25rem 0; padding: 0.75rem;
+            border: 1px solid var(--pico-muted-border-color); border-radius: 6px;
+            background: #fff;
+        }
+        .raw-drawer-title { margin-bottom: 0.4rem; font-size: 0.82em; color: var(--pico-muted-color); font-weight: 600; }
+        .raw-drawer pre {
+            margin: 0; padding: 0.75rem; max-height: 28rem; overflow: auto;
+            background: #111827; color: #f9fafb; border-radius: 4px;
+            font-size: 0.82em; line-height: 1.45;
+        }
+        .raw-event-list { width: 100%; margin: 0; font-size: 0.84em; border-collapse: collapse; }
+        .raw-event-list td { padding: 0.35rem 0.45rem; }
+        .raw-event-list tr.sub-row { cursor: pointer; }
+        .raw-event-list tr.sub-row:hover { background: #f0f7ff; }
+        .raw-event-list tr.sub-row.selected { background: #e3f0fc; }
+        .raw-event-list tr.sub-row .expand-caret {
+            display: inline-block; width: 0.85rem; text-align: center;
+            color: var(--pico-muted-color); margin-right: 0.3rem;
+            transition: transform 0.15s ease;
+        }
+        .raw-event-list tr.sub-row:hover .expand-caret { color: #1b6ca8; }
+        .raw-event-list tr.sub-row.selected .expand-caret { transform: rotate(90deg); color: #1b6ca8; }
+        .raw-event-list tr.sub-raw-row td {
+            padding: 0.3rem 0.45rem 0.6rem;
+            background: #fff;
+            border-top: 1px solid var(--pico-muted-border-color);
+        }
+        .summary-grid {
+            display: grid; grid-template-columns: max-content 1fr;
+            gap: 0.25rem 0.9rem; margin: 0 0 0.6rem 0;
+            font-size: 0.86em;
+        }
+        .summary-grid dt {
+            color: var(--pico-muted-color); font-weight: 600;
+            text-transform: uppercase; font-size: 0.78em; letter-spacing: 0.02em;
+            padding-top: 0.15rem;
+        }
+        .summary-grid dd { margin: 0; word-break: break-word; }
+        .summary-grid dd code {
+            background: #f1f5f9; padding: 0.1rem 0.35rem; border-radius: 3px;
+            font-size: 0.92em;
+        }
+        .summary-grid dd.summary-empty { color: var(--pico-muted-color); font-style: italic; }
+        .diff-note {
+            margin: 0.4rem 0 0.6rem 0; padding: 0.45rem 0.65rem;
+            background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px;
+            font-size: 0.82em; color: #5f4200;
+        }
+        .raw-details { margin-top: 0.4rem; }
+        .raw-details > summary {
+            cursor: pointer; font-size: 0.82em; color: var(--pico-muted-color);
+            padding: 0.25rem 0; user-select: none;
+        }
+        .raw-details > summary:hover { color: #1b6ca8; }
+        .debug-list { margin: 0.2rem 0 0 0; font-size: 0.85em; }
+        .debug-list .dk { color: var(--pico-muted-color); margin-right: 0.4rem; }
+        .debug-list .dv {
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: 0.92em; word-break: break-all;
+        }
+
+        .chip {
+            display: inline-flex; align-items: center;
+            padding: 0.1rem 0.45rem; border-radius: 999px;
+            font-size: 0.78em; white-space: nowrap;
+            border: 1px solid var(--pico-muted-border-color);
+        }
+        .chip-create  { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+        .chip-update  { background: #e3f0fc; border-color: #90caf9; color: #0d47a1; }
+        .chip-delete  { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
+        .chip-policy  { background: #f3e5f5; border-color: #ce93d8; color: #4a148c; }
+        .chip-success { background: #e8f5e9; border-color: #a5d6a7; color: #1b5e20; }
+        .chip-failure { background: #ffebee; border-color: #ef9a9a; color: #b71c1c; }
+        .chip-count   { background: #fff8e1; border-color: #ffe082; color: #5f4200; margin-left: 0.35rem; }
+
+        #loading-msg { text-align: center; padding: 3rem; color: var(--pico-muted-color); font-style: italic; }
+        #error-msg   { color: #b71c1c; padding: 1rem; font-size: 0.9em; display: none; }
+
+        footer {
+            text-align: center; font-size: 0.85em; color: var(--pico-muted-color);
+            margin-top: 2rem; margin-bottom: 2rem;
+            padding-top: 1rem; border-top: 1px solid var(--pico-muted-border-color);
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+
+    <div class="top-bar">
+        <hgroup>
+            <h2>Okta Change Auditor <a href="/howto" style="font-size:0.62em; color:#1b6ca8; text-decoration:none; font-weight:500; margin-left:0.5rem; padding:0.15rem 0.55rem; border-radius:999px; border:1px solid #cfe1ee; background:#f0f7fc; vertical-align:middle;">How it works</a></h2>
+            <p>What changed, when, and who did it &mdash; v{{ version }}</p>
+        </hgroup>
+        <div class="env-bar">
+            <span style="font-size:0.82em; color:var(--pico-muted-color)">Env:</span>
+            <button class="env-btn active" data-env="dev"  onclick="setEnv('dev')">DEV</button>
+            <button class="env-btn"        data-env="stg"  onclick="setEnv('stg')">STG</button>
+            <button class="env-btn env-prod" data-env="prod" onclick="setEnv('prod')">PROD</button>
+            <span style="border-left:1px solid #ddd; height:1.2em"></span>
+            <div class="range-bar">
+                <label>Range:</label>
+                <select id="range-preset" onchange="onRangePresetChange()">
+                    <option value="24" selected>Last 24h</option>
+                    <option value="48">Last 48h</option>
+                    <option value="72">Last 72h</option>
+                    <option value="168">Last 7d</option>
+                    <option value="336">Last 14d</option>
+                    <option value="720">Last 30d</option>
+                    <option value="custom">Custom…</option>
+                </select>
+                <span id="range-custom" style="display:none; gap:0.4rem; align-items:center;">
+                    <label for="range-from">From</label>
+                    <input id="range-from" type="datetime-local">
+                    <label for="range-to">To</label>
+                    <input id="range-to" type="datetime-local">
+                </span>
+            </div>
+            <button onclick="loadChanges()" style="margin:0; padding:0.25rem 1rem; font-size:0.85em">Refresh</button>
+        </div>
+    </div>
+
+    <div class="flag-bar" id="flag-bar"></div>
+
+    <div id="error-msg"></div>
+
+    <div class="filter-bar" id="filter-bar">
+        <label class="column-filter">Who <select id="filter-actor" onchange="setColumnFilter('actor', this.value)"></select></label>
+        <label class="column-filter">What <select id="filter-eventType" onchange="setColumnFilter('eventType', this.value)"></select></label>
+        <label class="column-filter">Target <select id="filter-target" onchange="setColumnFilter('target', this.value)"></select></label>
+        <label class="column-filter">Outcome <select id="filter-outcome" onchange="setColumnFilter('outcome', this.value)"></select></label>
+        <button class="filter-btn" type="button" onclick="clearColumnFilters()">Clear</button>
+    </div>
+
+    <div class="pill-bar" id="pill-bar"></div>
+
+    <div id="loading-msg" style="display:none">Loading changes from Okta&hellip;</div>
+
+    <div style="overflow-x:auto">
+        <table id="change-table">
+            <thead>
+                <tr>
+                    <th>When</th>
+                    <th>Who</th>
+                    <th>What (eventType)</th>
+                    <th>Target</th>
+                    <th>Outcome</th>
+                </tr>
+            </thead>
+            <tbody id="change-tbody"></tbody>
+        </table>
+    </div>
+
+    <footer>
+        Okta Change Auditor &middot; v{{ version }} &middot;
+        Data: Okta System Log &middot;
+        Scope: Okta only
+        {% if user %}
+            &middot; <span style="color:#1b6ca8">{{ user.email }}</span>
+            &middot; <a href="/logout">Sign out</a>
+        {% endif %}
+    </footer>
+
+</main>
+
+<script>
+    let currentEnv = 'dev';
+    let flagDefinitions = [];
+    let hideFlags = new Set();
+    let currentFilters = { actor: '', eventType: '', target: '', outcome: '' };
+    let allRows = [];
+    let lastResponseMeta = { filtered: {}, truncated: false, scanned: 0 };
+    let expandedRows = new Set();
+    let expandedSubByRow = new Map();
+
+    function collapseAll() {
+        expandedRows.clear();
+        expandedSubByRow.clear();
+    }
+
+    async function init() {
+        seedCustomRangeDefaults();
+        await Promise.all([probeEnvs(), loadFlagDefinitions()]);
+        renderFlagBar();
+        loadChanges();
+    }
+
+    async function probeEnvs() {
+        try {
+            const r = await fetch('/api/envs');
+            const envs = await r.json();
+            document.querySelectorAll('.env-btn').forEach(btn => {
+                const e = btn.dataset.env;
+                if (!envs[e]) {
+                    btn.disabled = true;
+                    btn.title = `No API token configured for ${e}`;
+                }
+            });
+        } catch (e) {
+            console.warn('env probe failed', e);
+        }
+    }
+
+    async function loadFlagDefinitions() {
+        try {
+            const r = await fetch('/api/flags');
+            const data = await r.json();
+            flagDefinitions = data.flags || [];
+            hideFlags = new Set(flagDefinitions.filter(f => f.default_hide).map(f => f.key));
+        } catch (e) {
+            console.warn('flag definitions probe failed', e);
+        }
+    }
+
+    function renderFlagBar() {
+        const bar = document.getElementById('flag-bar');
+        bar.innerHTML = '';
+        const filtered = lastResponseMeta.filtered || {};
+
+        const lead = document.createElement('span');
+        lead.className = 'flag-bar-label';
+        lead.textContent = 'Filters:';
+        bar.appendChild(lead);
+
+        for (const def of flagDefinitions) {
+            const isActive = hideFlags.has(def.key);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'flag-btn';
+            btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            btn.title = (def.hint || '') + (isActive ? ' — currently HIDING these events' : ' — currently SHOWING these events');
+            btn.onclick = () => {
+                if (isActive) hideFlags.delete(def.key);
+                else hideFlags.add(def.key);
+                loadChanges();
+            };
+
+            const text = document.createElement('span');
+            text.textContent = def.label;
+
+            const state = document.createElement('span');
+            state.className = 'flag-state';
+            state.textContent = isActive ? 'ON' : 'OFF';
+
+            btn.appendChild(text);
+            btn.appendChild(state);
+
+            const n = filtered[def.key] || 0;
+            if (n > 0) {
+                const count = document.createElement('span');
+                count.className = 'flag-count';
+                count.textContent = `· ${n.toLocaleString()} hidden`;
+                btn.appendChild(count);
+            }
+
+            bar.appendChild(btn);
+        }
+    }
+
+    function setEnv(env) {
+        currentEnv = env;
+        document.querySelectorAll('.env-btn').forEach(b =>
+            b.classList.toggle('active', b.dataset.env === env)
+        );
+        loadChanges();
+    }
+
+    function setColumnFilter(column, value) {
+        currentFilters[column] = value;
+        collapseAll();
+        applyFilters();
+    }
+
+    function clearColumnFilters() {
+        currentFilters = { actor: '', eventType: '', target: '', outcome: '' };
+        collapseAll();
+        applyFilters();
+    }
+
+    function onRangePresetChange() {
+        const preset = document.getElementById('range-preset').value;
+        const custom = document.getElementById('range-custom');
+        if (preset === 'custom') {
+            seedCustomRangeDefaults();
+            custom.style.display = 'inline-flex';
+        } else {
+            custom.style.display = 'none';
+            loadChanges();
+        }
+    }
+
+    function seedCustomRangeDefaults() {
+        const fromEl = document.getElementById('range-from');
+        const toEl = document.getElementById('range-to');
+        if (fromEl.value && toEl.value) return;
+        const preset = parseInt(document.getElementById('range-preset').value, 10);
+        const hours = Number.isNaN(preset) ? 24 : preset;
+        const now = new Date();
+        const since = new Date(now.getTime() - hours * 3600 * 1000);
+        toEl.value = toLocalInputValue(now);
+        fromEl.value = toLocalInputValue(since);
+    }
+
+    function toLocalInputValue(d) {
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+               `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function getSelectedRange() {
+        const presetEl = document.getElementById('range-preset');
+        const value = presetEl.value;
+        if (value === 'custom') {
+            const fromVal = document.getElementById('range-from').value;
+            const toVal = document.getElementById('range-to').value;
+            if (!fromVal || !toVal) return null;
+            const since = new Date(fromVal);
+            const until = new Date(toVal);
+            if (Number.isNaN(since.getTime()) || Number.isNaN(until.getTime())) return null;
+            if (since >= until) return { error: 'From must be earlier than To' };
+            return { since: since.toISOString(), until: until.toISOString() };
+        }
+        const hours = parseInt(value, 10);
+        const until = new Date();
+        const since = new Date(until.getTime() - hours * 3600 * 1000);
+        return { since: since.toISOString(), until: until.toISOString() };
+    }
+
+    async function loadChanges() {
+        const errEl = document.getElementById('error-msg');
+        const tbody = document.getElementById('change-tbody');
+        const loadEl = document.getElementById('loading-msg');
+
+        const range = getSelectedRange();
+        tbody.innerHTML = '';
+        collapseAll();
+        errEl.style.display = 'none';
+
+        if (!range) {
+            errEl.textContent = 'Please choose both From and To for the custom range.';
+            errEl.style.display = 'block';
+            return;
+        }
+        if (range.error) {
+            errEl.textContent = range.error;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        loadEl.style.display = 'block';
+        try {
+            const params = new URLSearchParams({
+                env: currentEnv,
+                since: range.since,
+                until: range.until,
+                hide: Array.from(hideFlags).join(','),
+            });
+            const r = await fetch(`/api/changes?${params.toString()}`);
+            const data = await r.json();
+            loadEl.style.display = 'none';
+            if (!r.ok) {
+                errEl.textContent = data.error || `HTTP ${r.status}`;
+                errEl.style.display = 'block';
+                return;
+            }
+            allRows = data.rows || [];
+            lastResponseMeta = {
+                filtered: data.filtered || {},
+                truncated: !!data.truncated,
+                scanned: data.scanned || 0,
+            };
+            renderFlagBar();
+            applyFilters();
+        } catch (e) {
+            loadEl.style.display = 'none';
+            errEl.textContent = `Fetch failed: ${e}`;
+            errEl.style.display = 'block';
+        }
+    }
+
+    function actionChipClass(eventType) {
+        if (!eventType) return 'chip';
+        if (eventType.includes('.delete') || eventType.includes('.deactivate')) return 'chip chip-delete';
+        if (eventType.includes('.create') || eventType.includes('.activate'))   return 'chip chip-create';
+        if (eventType.includes('.update') || eventType.includes('.add') || eventType.includes('.remove')) return 'chip chip-update';
+        if (eventType.startsWith('policy.')) return 'chip chip-policy';
+        return 'chip';
+    }
+
+    const EVENT_TYPE_LABELS = {
+        'application.lifecycle.create':       'Created app',
+        'application.lifecycle.update':       'Updated app',
+        'application.lifecycle.activate':     'Activated app',
+        'application.lifecycle.deactivate':   'Deactivated app',
+        'application.lifecycle.delete':       'Deleted app',
+        'application.user_membership.add':    'Assigned user to app',
+        'application.user_membership.remove': 'Removed user from app',
+        'application.user_membership.update': 'Updated app assignment',
+        'application.user_membership.change_username':   'Changed app username',
+        'application.user_membership.change_credentials': 'Changed app credentials',
+        'application.policy.sign_on.update':       'Updated app sign-on policy',
+        'application.policy.sign_on.rule.add':     'Added app sign-on rule',
+        'application.policy.sign_on.rule.update':  'Updated app sign-on rule',
+        'application.policy.sign_on.rule.delete':  'Deleted app sign-on rule',
+        'application.policy.sign_on.deny_access':  'Denied app sign-on',
+        'user.lifecycle.create':       'Created user',
+        'user.lifecycle.activate':     'Activated user',
+        'user.lifecycle.deactivate':   'Deactivated user',
+        'user.lifecycle.delete':       'Deleted user',
+        'user.lifecycle.suspend':      'Suspended user',
+        'user.lifecycle.unsuspend':    'Unsuspended user',
+        'user.lifecycle.unlock':       'Unlocked user',
+        'user.account.update_profile':    'Updated user profile',
+        'user.account.privilege.grant':   'Granted admin role',
+        'user.account.privilege.revoke':  'Revoked admin role',
+        'group.lifecycle.create':         'Created group',
+        'group.lifecycle.update':         'Updated group',
+        'group.lifecycle.delete':         'Deleted group',
+        'group.user_membership.add':      'Added user to group',
+        'group.user_membership.remove':   'Removed user from group',
+        'policy.lifecycle.create':     'Created policy',
+        'policy.lifecycle.update':     'Updated policy',
+        'policy.lifecycle.activate':   'Activated policy',
+        'policy.lifecycle.deactivate': 'Deactivated policy',
+        'policy.lifecycle.delete':     'Deleted policy',
+        'policy.rule.add':         'Added policy rule',
+        'policy.rule.update':      'Updated policy rule',
+        'policy.rule.activate':    'Activated policy rule',
+        'policy.rule.deactivate':  'Deactivated policy rule',
+        'policy.rule.delete':      'Deleted policy rule',
+        'system.idp.lifecycle.create':              'Created identity provider',
+        'system.idp.lifecycle.update':              'Updated identity provider',
+        'system.idp.lifecycle.activate':            'Activated identity provider',
+        'system.idp.lifecycle.deactivate':          'Deactivated identity provider',
+        'system.idp.lifecycle.delete':              'Deleted identity provider',
+        'system.idp.lifecycle.read_client_secret':  'Read IdP client secret',
+        'zone.lifecycle.create':       'Created network zone',
+        'zone.lifecycle.update':       'Updated network zone',
+        'zone.lifecycle.activate':     'Activated network zone',
+        'zone.lifecycle.deactivate':   'Deactivated network zone',
+        'zone.lifecycle.delete':       'Deleted network zone',
+        'authenticator.lifecycle.create':     'Created authenticator',
+        'authenticator.lifecycle.update':     'Updated authenticator',
+        'authenticator.lifecycle.activate':   'Activated authenticator',
+        'authenticator.lifecycle.deactivate': 'Deactivated authenticator',
+        'authenticator.lifecycle.delete':     'Deleted authenticator',
+    };
+
+    const ACTION_VERBS = {
+        create: 'Created',
+        update: 'Updated',
+        activate: 'Activated',
+        deactivate: 'Deactivated',
+        delete: 'Deleted',
+        add: 'Added',
+        remove: 'Removed',
+        grant: 'Granted',
+        revoke: 'Revoked',
+        suspend: 'Suspended',
+        unsuspend: 'Unsuspended',
+        unlock: 'Unlocked',
+        read: 'Read',
+    };
+
+    function humanizeEventType(eventType) {
+        if (!eventType) return '';
+        if (EVENT_TYPE_LABELS[eventType]) return EVENT_TYPE_LABELS[eventType];
+        const segments = eventType.split('.');
+        if (segments.length < 2) return eventType;
+        const action = segments[segments.length - 1];
+        const object = segments.slice(0, -1).join(' ').replace(/_/g, ' ');
+        const verb = ACTION_VERBS[action] || (action.charAt(0).toUpperCase() + action.slice(1));
+        return `${verb} ${object}`;
+    }
+
+    function isGroupedRow(row) {
+        return Number(row.count || 1) > 1;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        }[ch]));
+    }
+
+    function targetDisplay(target) {
+        if (!target) return '';
+        if (target.type === 'AppInstance') {
+            return target.alternateId || target.displayName || target.id || '';
+        }
+        return target.displayName || target.alternateId || target.id || '';
+    }
+
+    function rawTarget(event) {
+        const targets = event?.target || [];
+        if (!targets.length) return '';
+        const first = targets[0] || {};
+        const display = targetDisplay(first);
+        const type = first.type || '';
+        if (display && type) return `${display} (${type})`;
+        return display || type;
+    }
+
+    function rawOutcome(event) {
+        return event?.outcome?.result || '';
+    }
+
+    function rawWhen(event) {
+        const value = event?.published || '';
+        if (!value) return '';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString();
+    }
+
+    function displayTarget(row) {
+        if (isGroupedRow(row)) {
+            return (row.sample_targets || []).join('; ');
+        }
+        return row.target || '';
+    }
+
+    function columnValue(row, column) {
+        if (column === 'actor') return row.actor || '';
+        if (column === 'eventType') return row.eventType || '';
+        if (column === 'target') return displayTarget(row);
+        if (column === 'outcome') return row.outcome || '';
+        return '';
+    }
+
+    function columnLabel(column) {
+        if (column === 'actor') return 'Who';
+        if (column === 'eventType') return 'What';
+        if (column === 'target') return 'Target';
+        if (column === 'outcome') return 'Outcome';
+        return column;
+    }
+
+    function rowMatchesFilters(row, excludeColumn = null) {
+        for (const [column, selected] of Object.entries(currentFilters)) {
+            if (column === excludeColumn) continue;
+            if (selected && columnValue(row, column) !== selected) return false;
+        }
+        return true;
+    }
+
+    function optionDisplay(column, value) {
+        if (column === 'eventType') return humanizeEventType(value);
+        return value;
+    }
+
+    function populateColumnFilter(column, label) {
+        const select = document.getElementById(`filter-${column}`);
+        const counts = {};
+        for (const row of allRows) {
+            if (!rowMatchesFilters(row, column)) continue;
+            const value = columnValue(row, column);
+            if (!value) continue;
+            counts[value] = (counts[value] || 0) + (row.count || 1);
+        }
+
+        const selected = currentFilters[column];
+        if (selected && !counts[selected]) {
+            currentFilters[column] = '';
+        }
+
+        const entries = Object.entries(counts).sort((a, b) => {
+            if (b[1] !== a[1]) return b[1] - a[1];
+            return a[0].localeCompare(b[0]);
+        });
+
+        select.innerHTML = `<option value="">All ${label}</option>`;
+        for (const [value, count] of entries) {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = `${optionDisplay(column, value)} (${count.toLocaleString()} events)`;
+            option.title = value;
+            option.selected = currentFilters[column] === value;
+            select.appendChild(option);
+        }
+    }
+
+    function populateColumnFilters() {
+        populateColumnFilter('actor', 'Who');
+        populateColumnFilter('eventType', 'What');
+        populateColumnFilter('target', 'Target');
+        populateColumnFilter('outcome', 'Outcome');
+    }
+
+    function rowMatchesColumnFilters(row) {
+        return rowMatchesFilters(row, null);
+    }
+
+    function formatDuration(seconds) {
+        if (seconds < 1) return '<1s';
+        if (seconds < 60) return `${Math.round(seconds)}s`;
+        if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+        return `${(seconds / 3600).toFixed(1)}h`;
+    }
+
+    function whenCellHTML(row) {
+        const main = escapeHtml(row.when);
+        if (!isGroupedRow(row) || !row.when_oldest) return main;
+        const newest = new Date(row.when);
+        const oldest = new Date(row.when_oldest);
+        if (Number.isNaN(newest.getTime()) || Number.isNaN(oldest.getTime())) return main;
+        const span = Math.abs((newest - oldest) / 1000);
+        return `${main}<span class="when-span">(${formatDuration(span)})</span>`;
+    }
+
+    function toggleRawRow(index) {
+        if (expandedRows.has(index)) {
+            expandedRows.delete(index);
+            expandedSubByRow.delete(index);
+        } else {
+            expandedRows.add(index);
+        }
+        applyFilters();
+    }
+
+    function toggleSubRow(parentIndex, subIdx) {
+        if (expandedSubByRow.get(parentIndex) === subIdx) {
+            expandedSubByRow.delete(parentIndex);
+        } else {
+            expandedSubByRow.set(parentIndex, subIdx);
+        }
+        applyFilters();
+    }
+
+    const NO_DIFF_SUFFIXES = ['.lifecycle.update', '.lifecycle.activate', '.lifecycle.deactivate', '.lifecycle.delete'];
+    function eventLacksDiff(eventType) {
+        if (!eventType) return false;
+        return NO_DIFF_SUFFIXES.some(s => eventType.endsWith(s));
+    }
+
+    function actorSummary(event) {
+        const a = event?.actor || {};
+        const name = a.displayName || '';
+        const id = a.alternateId || a.id || '';
+        if (name && id && name !== id) return `${name} (${id})`;
+        return name || id || '';
+    }
+
+    function targetSummary(event) {
+        const targets = event?.target || [];
+        if (!targets.length) return '';
+        return targets.map(t => {
+            const display = targetDisplay(t);
+            const type = t?.type || '';
+            return display && type ? `${display} (${type})` : (display || type);
+        }).join('; ');
+    }
+
+    function originSummary(event) {
+        const ips = ((event?.request?.ipChain) || []).map(c => c.ip).filter(Boolean);
+        const geo = event?.client?.geographicalContext || {};
+        const place = [geo.city, geo.state, geo.country].filter(Boolean).join(', ');
+        const ipPart = ips.length ? ips.join(', ') : '';
+        if (ipPart && place) return `${ipPart} — ${place}`;
+        return ipPart || place || '';
+    }
+
+    function debugDataEntries(event) {
+        const dd = (event?.debugContext?.debugData) || {};
+        const NOISE = new Set(['dtHash', 'requestId', 'traceId']);
+        return Object.entries(dd).filter(([k]) => !NOISE.has(k));
+    }
+
+    function summaryRow(label, value) {
+        const dt = document.createElement('dt');
+        dt.textContent = label;
+        const dd = document.createElement('dd');
+        if (value === '' || value == null) {
+            dd.textContent = '—';
+            dd.classList.add('summary-empty');
+        } else if (value instanceof Node) {
+            dd.appendChild(value);
+        } else {
+            dd.innerHTML = value;
+        }
+        return [dt, dd];
+    }
+
+    function makeSummaryPanel(event, eventType) {
+        const wrap = document.createElement('div');
+
+        const grid = document.createElement('dl');
+        grid.className = 'summary-grid';
+
+        const outcome = event?.outcome || {};
+        const outcomeText = outcome.result
+            ? (outcome.reason ? `${outcome.result} — ${outcome.reason}` : outcome.result)
+            : '';
+
+        const debugData = event?.debugContext?.debugData || {};
+        const requestUri = debugData.requestUri || '';
+
+        let changedAttrs = debugData.changedAttributes;
+        if (Array.isArray(changedAttrs)) changedAttrs = changedAttrs.join(', ');
+
+        const firstTarget = (event?.target || [])[0] || {};
+        const detailEntry = firstTarget.detailEntry || null;
+
+        const rows = [
+            ['Actor',       escapeHtml(actorSummary(event))],
+            ['Target',      escapeHtml(targetSummary(event))],
+            ['Outcome',     escapeHtml(outcomeText)],
+            ['Description', escapeHtml(event?.displayMessage || '')],
+            ['When',        escapeHtml(rawWhen(event))],
+            ['From',        escapeHtml(originSummary(event))],
+            ['API endpoint', requestUri ? `<code>${escapeHtml(requestUri)}</code>` : ''],
+        ];
+        if (changedAttrs) {
+            rows.push(['Changed fields', `<code>${escapeHtml(String(changedAttrs))}</code>`]);
+        }
+        if (detailEntry && typeof detailEntry === 'object' && Object.keys(detailEntry).length) {
+            const inline = Object.entries(detailEntry)
+                .map(([k, v]) => `<span class="dk">${escapeHtml(k)}:</span><span class="dv">${escapeHtml(typeof v === 'string' ? v : JSON.stringify(v))}</span>`)
+                .join(' &nbsp; ');
+            rows.push(['Target detail', `<div class="debug-list">${inline}</div>`]);
+        }
+        for (const [label, value] of rows) {
+            const [dt, dd] = summaryRow(label, value);
+            grid.appendChild(dt);
+            grid.appendChild(dd);
+        }
+
+        const seen = new Set(['requestUri', 'changedAttributes']);
+        const extras = debugDataEntries(event).filter(([k]) => !seen.has(k));
+        if (extras.length) {
+            const dt = document.createElement('dt');
+            dt.textContent = 'Debug data';
+            const dd = document.createElement('dd');
+            const ul = document.createElement('div');
+            ul.className = 'debug-list';
+            for (const [k, v] of extras) {
+                const line = document.createElement('div');
+                const value = typeof v === 'string' ? v : JSON.stringify(v);
+                line.innerHTML = `<span class="dk">${escapeHtml(k)}:</span><span class="dv">${escapeHtml(value)}</span>`;
+                ul.appendChild(line);
+            }
+            dd.appendChild(ul);
+            grid.appendChild(dt);
+            grid.appendChild(dd);
+        }
+        wrap.appendChild(grid);
+
+        if (eventLacksDiff(eventType)) {
+            const note = document.createElement('div');
+            note.className = 'diff-note';
+            note.textContent = `Okta does not log field-level diffs for ${eventType}. The API endpoint above identifies the resource that was changed; comparing snapshots over time is the only way to see what actually changed.`;
+            wrap.appendChild(note);
+        }
+
+        return wrap;
+    }
+
+    function makeRawJSONDetails(payload, label = 'Raw event JSON') {
+        const details = document.createElement('details');
+        details.className = 'raw-details';
+        const summary = document.createElement('summary');
+        summary.textContent = label;
+        details.appendChild(summary);
+        const pre = document.createElement('pre');
+        pre.textContent = JSON.stringify(payload, null, 2);
+        details.appendChild(pre);
+        return details;
+    }
+
+    function makeRawDrawerRow(row, parentIndex) {
+        const rawTr = document.createElement('tr');
+        rawTr.className = 'raw-row';
+
+        const td = document.createElement('td');
+        td.colSpan = 5;
+
+        const drawer = document.createElement('div');
+        drawer.className = 'raw-drawer';
+
+        if (isGroupedRow(row)) {
+            const currentSubIdx = expandedSubByRow.get(parentIndex);
+            const title = document.createElement('div');
+            title.className = 'raw-drawer-title';
+            title.textContent = `${row.count} source events — click any row for details`;
+            drawer.appendChild(title);
+
+            const table = document.createElement('table');
+            table.className = 'raw-event-list';
+            const tbody = document.createElement('tbody');
+            const events = row.raw || [];
+            events.forEach((event, subIdx) => {
+                const isOpen = currentSubIdx === subIdx;
+                const sub = document.createElement('tr');
+                sub.className = `sub-row ${isOpen ? 'selected' : ''}`;
+                sub.tabIndex = 0;
+                sub.onclick = (e) => { e.stopPropagation(); toggleSubRow(parentIndex, subIdx); };
+                sub.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleSubRow(parentIndex, subIdx);
+                    }
+                };
+                const outcome = rawOutcome(event);
+                sub.innerHTML = `
+                    <td><span class="expand-caret" aria-hidden="true">&#9656;</span>${escapeHtml(rawWhen(event))}</td>
+                    <td>${escapeHtml(rawTarget(event))}</td>
+                    <td><span class="chip ${outcome === 'SUCCESS' ? 'chip-success' : outcome ? 'chip-failure' : ''}">${escapeHtml(outcome)}</span></td>
+                `;
+                tbody.appendChild(sub);
+
+                if (isOpen) {
+                    const detailTr = document.createElement('tr');
+                    detailTr.className = 'sub-raw-row';
+                    const detailTd = document.createElement('td');
+                    detailTd.colSpan = 3;
+                    const inner = document.createElement('div');
+                    inner.className = 'raw-drawer';
+                    inner.appendChild(makeSummaryPanel(event, event?.eventType || row.eventType));
+                    inner.appendChild(makeRawJSONDetails(event));
+                    detailTd.appendChild(inner);
+                    detailTr.appendChild(detailTd);
+                    tbody.appendChild(detailTr);
+                }
+            });
+            table.appendChild(tbody);
+            drawer.appendChild(table);
+            drawer.appendChild(makeRawJSONDetails(row.raw || [], `Raw JSON (all ${row.count} events)`));
+            td.appendChild(drawer);
+            rawTr.appendChild(td);
+            return rawTr;
+        }
+
+        drawer.appendChild(makeSummaryPanel(row.raw || {}, row.eventType));
+        drawer.appendChild(makeRawJSONDetails(row.raw || {}));
+        td.appendChild(drawer);
+        rawTr.appendChild(td);
+        return rawTr;
+    }
+
+    function applyFilters() {
+        const tbody = document.getElementById('change-tbody');
+        const pillBar = document.getElementById('pill-bar');
+        tbody.innerHTML = '';
+
+        populateColumnFilters();
+
+        let shown = 0;
+        let represented = 0;
+
+        for (const [index, row] of allRows.entries()) {
+            if (!rowMatchesColumnFilters(row)) continue;
+
+            const isExpanded = expandedRows.has(index);
+            const tr = document.createElement('tr');
+            tr.className = `change-row ${isExpanded ? 'selected' : ''}`;
+            tr.tabIndex = 0;
+            tr.onclick = () => toggleRawRow(index);
+            tr.onkeydown = (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleRawRow(index);
+                }
+            };
+            const countBadge = isGroupedRow(row)
+                ? `<span class="chip chip-count">${escapeHtml(row.count)} events</span>`
+                : '';
+            const friendly = humanizeEventType(row.eventType);
+            tr.innerHTML = `
+                <td class="col-when"><span class="expand-caret" aria-hidden="true">&#9656;</span>${whenCellHTML(row)}</td>
+                <td class="col-who">${escapeHtml(row.actor)}</td>
+                <td class="col-what">
+                    <span class="${actionChipClass(row.eventType)} event-label" title="${escapeHtml(row.eventType)}">${escapeHtml(friendly)}</span>${countBadge}
+                    <span class="event-type-raw">${escapeHtml(row.eventType)}</span>
+                </td>
+                <td>${escapeHtml(displayTarget(row))}</td>
+                <td><span class="chip ${row.outcome === 'SUCCESS' ? 'chip-success' : row.outcome ? 'chip-failure' : ''}">${escapeHtml(row.outcome)}</span></td>
+            `;
+            tbody.appendChild(tr);
+            if (isExpanded) {
+                tbody.appendChild(makeRawDrawerRow(row, index));
+            }
+            shown++;
+            represented += row.count || 1;
+        }
+
+        const activeFilterPills = Object.entries(currentFilters)
+            .filter(([, value]) => value)
+            .map(([column, value]) => `<span class="pill">${escapeHtml(columnLabel(column))}: ${escapeHtml(value)}</span>`)
+            .join('');
+
+        const truncPill = lastResponseMeta.truncated
+            ? `<span class="pill pill-truncated" title="Scanned ${(lastResponseMeta.scanned || 0).toLocaleString()} events before hitting the budget. Older changes may be missing — narrow the range or use the column filters to zero in.">truncated</span>`
+            : '';
+
+        pillBar.innerHTML = `
+            <span class="pill">${shown} shown / ${allRows.length} total</span>
+            <span class="pill">${represented} source events</span>
+            ${truncPill}
+            ${activeFilterPills}
+        `;
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
