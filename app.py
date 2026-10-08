@@ -716,7 +716,7 @@ LOGIN_HTML = """<!doctype html>
 {% if error %}
   {% if 'access_denied' in error %}
   <div class="vpn">
-    <b></b> This app is restricted to the internal network. Connect to the VPN client, then click Sign in again.
+    This app is restricted to the internal network. Connect to the VPN client, then click Sign in again.
     <span class="raw">{{ error }}</span>
   </div>
   {% else %}
