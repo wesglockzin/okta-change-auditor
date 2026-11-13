@@ -24,7 +24,6 @@ from flask import (
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import (
-    ConfigError,
     csv_set,
     env_int,
     is_user_allowed,
@@ -72,7 +71,9 @@ AUTOMATION_UA_SUBSTRINGS: tuple[str, ...] = tuple(
 
 # Exact user-agent values excluded server-side (case kept: Okta compares exactly).
 SERVER_SIDE_AUTOMATION_UA_EXACT: tuple[str, ...] = tuple(
-    p.strip() for p in os.environ.get("SERVER_SIDE_AUTOMATION_UA_EXACT", "Azuqua").split(",") if p.strip()
+    p.strip()
+    for p in os.environ.get("SERVER_SIDE_AUTOMATION_UA_EXACT", "Azuqua").split(",")
+    if p.strip()
 )
 
 
@@ -125,9 +126,9 @@ def _event_is_lifecycle_ops(event: dict) -> bool:
 
 def _event_flags(event: dict) -> dict[str, bool]:
     return {
-        "automated":     _event_is_automated(event),
-        "system":        _event_is_system(event),
-        "membership":    _event_is_membership(event),
+        "automated": _event_is_automated(event),
+        "system": _event_is_system(event),
+        "membership": _event_is_membership(event),
         "lifecycle_ops": _event_is_lifecycle_ops(event),
     }
 
@@ -228,7 +229,7 @@ def _build_okta_filter(hide_flags: frozenset[str]) -> str:
     if "automated" in hide_flags:
         for ua in SERVER_SIDE_AUTOMATION_UA_EXACT:
             parts.append(f'client.userAgent.rawUserAgent ne "{ua}"')
-        parts.append('client.userAgent.rawUserAgent pr')
+        parts.append("client.userAgent.rawUserAgent pr")
     if "system" in hide_flags:
         parts.append('actor.alternateId ne "system@okta.com"')
         parts.append('actor.type ne "SystemPrincipal"')
@@ -272,18 +273,8 @@ def _target_label(event: dict) -> str:
 
 def _target_display(target: dict) -> str:
     if (target.get("type") or "") == "AppInstance":
-        return (
-            target.get("alternateId")
-            or target.get("displayName")
-            or target.get("id")
-            or ""
-        )
-    return (
-        target.get("displayName")
-        or target.get("alternateId")
-        or target.get("id")
-        or ""
-    )
+        return target.get("alternateId") or target.get("displayName") or target.get("id") or ""
+    return target.get("displayName") or target.get("alternateId") or target.get("id") or ""
 
 
 def _project_change_event(event: dict) -> dict:
@@ -433,7 +424,9 @@ def _maybe_pre_throttle(response: requests.Response, env: str) -> None:
     wait_padded = wait + 1.0
     logging.getLogger(__name__).info(
         "[%s] Okta bucket low (remaining=%d); sleeping %.1fs until reset",
-        env, remaining, wait_padded,
+        env,
+        remaining,
+        wait_padded,
     )
     time.sleep(wait_padded)
 
@@ -461,7 +454,10 @@ def _okta_get_with_retry(
         wait = _okta_429_wait_seconds(response)
         logging.getLogger(__name__).warning(
             "[%s] Okta 429; waiting %.1fs (attempt %d/%d)",
-            env, wait, attempt + 1, OKTA_429_MAX_RETRIES,
+            env,
+            wait,
+            attempt + 1,
+            OKTA_429_MAX_RETRIES,
         )
         time.sleep(wait)
     return response
@@ -494,7 +490,9 @@ def _count_okta_events_by_prefix(
         if not response.ok:
             log.warning(
                 "[%s] count request failed: HTTP %s %s",
-                env, response.status_code, response.text[:200].strip(),
+                env,
+                response.status_code,
+                response.text[:200].strip(),
             )
             break
         events = response.json()
@@ -512,7 +510,7 @@ def _count_okta_events_by_prefix(
 
 
 PREFIX_HIDE_FAMILIES: dict[str, tuple[str, ...]] = {
-    "membership":    MEMBERSHIP_PREFIXES,
+    "membership": MEMBERSHIP_PREFIXES,
     "lifecycle_ops": LIFECYCLE_OPS_PREFIXES,
 }
 
@@ -541,7 +539,10 @@ def _fetch_changes(
             for flag in prefix_active:
                 count_futures[flag] = count_executor.submit(
                     _count_okta_events_by_prefix,
-                    env, since, until, PREFIX_HIDE_FAMILIES[flag],
+                    env,
+                    since,
+                    until,
+                    PREFIX_HIDE_FAMILIES[flag],
                 )
             count_executor.shutdown(wait=False)
 
@@ -566,9 +567,7 @@ def _fetch_changes(
             truncated = True
             break
 
-        response = _okta_get_with_retry(
-            _session, next_url, next_params, headers, env
-        )
+        response = _okta_get_with_retry(_session, next_url, next_params, headers, env)
         if response.status_code == 401:
             raise RuntimeError(f"Okta API returned 401 for {env}; check the API token")
         if response.status_code == 429:
@@ -581,8 +580,7 @@ def _fetch_changes(
         if not response.ok:
             detail = response.text[:500].strip()
             raise RuntimeError(
-                f"Okta System Log request failed for {env}: "
-                f"HTTP {response.status_code} {detail}"
+                f"Okta System Log request failed for {env}: HTTP {response.status_code} {detail}"
             )
 
         events = response.json()
@@ -615,8 +613,10 @@ def _fetch_changes(
             next_params = None
 
     rows.sort(
-        key=lambda row: _parse_okta_datetime((row.get("raw") or {}).get("published"))
-        or datetime.min.replace(tzinfo=timezone.utc),
+        key=lambda row: (
+            _parse_okta_datetime((row.get("raw") or {}).get("published"))
+            or datetime.min.replace(tzinfo=timezone.utc)
+        ),
         reverse=True,
     )
     grouped = _collapse_bursts(rows)
@@ -741,7 +741,9 @@ def oidc_login():
 @app.get("/oidc/callback")
 def oidc_callback():
     if request.args.get("error"):
-        session["login_error"] = f"{request.args.get('error')}: {request.args.get('error_description', '')}"
+        session["login_error"] = (
+            f"{request.args.get('error')}: {request.args.get('error_description', '')}"
+        )
         return redirect(url_for("login"))
     try:
         token = oauth.okta.authorize_access_token()
@@ -829,7 +831,9 @@ def api_changes():
         requested = {p.strip() for p in hide_arg.split(",") if p.strip()}
         unknown = requested - KNOWN_FLAGS
         if unknown:
-            return jsonify(error=f"unknown hide flags: {sorted(unknown)}; known: {sorted(KNOWN_FLAGS)}"), 400
+            return jsonify(
+                error=f"unknown hide flags: {sorted(unknown)}; known: {sorted(KNOWN_FLAGS)}"
+            ), 400
         hide_flags = frozenset(requested)
 
     try:

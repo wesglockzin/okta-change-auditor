@@ -115,7 +115,9 @@ def test_429_retries_then_returns(monkeypatch):
 def test_429_gives_up_after_max_retries(monkeypatch):
     monkeypatch.setattr(auditor.time, "sleep", lambda s: None)
     fake = FakeSession([FakeResponse(429)] * (auditor.OKTA_429_MAX_RETRIES + 1))
-    assert auditor._okta_get_with_retry(fake, "https://x.test", None, {}, "alpha").status_code == 429
+    assert (
+        auditor._okta_get_with_retry(fake, "https://x.test", None, {}, "alpha").status_code == 429
+    )
 
 
 def fetch(monkeypatch, responses, **kw):

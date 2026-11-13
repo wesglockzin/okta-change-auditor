@@ -73,7 +73,9 @@ def test_allow_list():
     assert not is_user_allowed(None, auth)
 
 
-@pytest.mark.parametrize("target", ["//evil.test", "/\\evil.test", "https://evil.test", "evil", "", None])
+@pytest.mark.parametrize(
+    "target", ["//evil.test", "/\\evil.test", "https://evil.test", "evil", "", None]
+)
 def test_safe_next_rejects(target):
     assert safe_next(target) is None
 
