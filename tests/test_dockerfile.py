@@ -18,5 +18,9 @@ def test_cmd_flags_are_separated_by_spaces():
     assert "--workers 2 --threads 4" in cmd
 
 
+def test_cmd_preloads_app_so_workers_share_the_session_key():
+    assert "--preload" in _cmd_line()
+
+
 def test_cmd_reads_port():
     assert "${PORT}" in _cmd_line()
