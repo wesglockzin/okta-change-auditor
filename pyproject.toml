@@ -22,7 +22,15 @@ keyring = ["keyring>=25,<26"]
 dev = [
     "pytest>=9.0.3",
     "ruff>=0.6",
+    "deptry>=0.20",
 ]
+
+[tool.deptry]
+pep621_dev_dependency_groups = ["dev"]
+
+[tool.deptry.per_rule_ignores]
+# gunicorn is the server started by the Dockerfile; it is never imported.
+DEP002 = ["gunicorn"]
 
 [tool.setuptools]
 py-modules = ["app", "config", "shared_docs", "shared_http", "setup_tokens"]
@@ -36,4 +44,4 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I", "BLE", "S110", "S112"]
+select = ["E4", "E7", "E9", "F", "I", "BLE", "S110", "S112", "T20"]

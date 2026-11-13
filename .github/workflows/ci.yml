@@ -22,6 +22,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
+      - run: deptry .
       - run: pip install pip-audit && pip-audit .
       - uses: gitleaks/gitleaks-action@v2
         env:
