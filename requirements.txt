@@ -1,6 +1,1 @@
-flask
-gunicorn
-requests
-keyring
-Authlib
-markdown>=3.5
+.

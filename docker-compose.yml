@@ -1,0 +1,8 @@
+services:
+  okta-change-auditor:
+    build: .
+    env_file: .env
+    environment:
+      PORT: "8080"
+    ports:
+      - "8080:8080"
