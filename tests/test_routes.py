@@ -19,6 +19,14 @@ def test_envs_come_from_settings(client):
     assert client.get("/api/envs").json == {"alpha": True, "beta": False}
 
 
+def test_index_renders_buttons_from_settings(client):
+    html = client.get("/").get_data(as_text=True)
+    assert 'data-env="alpha"' in html
+    assert 'data-env="beta"' in html
+    assert 'data-env="dev"' not in html
+    assert "let currentEnv = \"alpha\";" in html
+
+
 def test_unknown_env_and_bad_hours(client):
     assert client.get("/api/changes?env=nope").status_code == 400
     assert client.get("/api/changes?env=alpha&hours=-5").status_code == 400

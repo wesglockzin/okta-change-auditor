@@ -230,9 +230,9 @@
         </hgroup>
         <div class="env-bar">
             <span style="font-size:0.82em; color:var(--pico-muted-color)">Env:</span>
-            <button class="env-btn active" data-env="dev"  onclick="setEnv('dev')">DEV</button>
-            <button class="env-btn"        data-env="stg"  onclick="setEnv('stg')">STG</button>
-            <button class="env-btn env-prod" data-env="prod" onclick="setEnv('prod')">PROD</button>
+            {% for name in envs %}
+            <button class="env-btn{% if loop.first %} active{% endif %}{% if name|lower == 'prod' %} env-prod{% endif %}" data-env="{{ name }}" onclick="setEnv(this.dataset.env)">{{ name|upper }}</button>
+            {% endfor %}
             <span style="border-left:1px solid #ddd; height:1.2em"></span>
             <div class="range-bar">
                 <label>Range:</label>
@@ -300,7 +300,7 @@
 </main>
 
 <script>
-    let currentEnv = 'dev';
+    let currentEnv = {{ (envs[0] if envs else '')|tojson }};
     let flagDefinitions = [];
     let hideFlags = new Set();
     let currentFilters = { actor: '', eventType: '', target: '', outcome: '' };

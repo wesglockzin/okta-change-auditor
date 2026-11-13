@@ -689,7 +689,12 @@ register_howto(app, tool_name="Okta Change Auditor")
 
 @app.route("/")
 def index():
-    return render_template("index.html", version=APP_VERSION, user=session.get("user"))
+    return render_template(
+        "index.html",
+        version=APP_VERSION,
+        user=session.get("user"),
+        envs=list(OKTA_URLS),
+    )
 
 
 @app.route("/health")
@@ -787,7 +792,7 @@ def _parse_iso_arg(value: str) -> datetime:
 
 @app.route("/api/changes")
 def api_changes():
-    env = request.args.get("env", "dev")
+    env = request.args.get("env") or next(iter(OKTA_URLS))
     if env not in OKTA_URLS:
         return jsonify(error=f"unknown env: {env}"), 400
 
