@@ -27,7 +27,7 @@ Tests: `pip install -e ".[dev]" && pytest`.
 ## Configuration
 Every setting is an environment variable; `.env.example` lists them all with defaults.
 Required settings have no default, and the app refuses to start naming the missing one.
-- `OKTA_ORGS` (required): `name=url` pairs, comma separated, any number. The page highlights only an org named `prod` as production.
+- `OKTA_ORGS` (required): `name=url` pairs, comma separated, any number. The page highlights only an org named `prod` (any letter case) as production.
 - `OKTA_AUDITOR_<NAME>_API_TOKEN` (one per org): a read-only token with System Log read
   access. The optional OS keyring (`pip install '.[keyring]'`, then `python setup_tokens.py`)
   is only a fallback when the variable is empty.
