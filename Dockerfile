@@ -25,4 +25,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['PORT'] + '/health', timeout=3)" || exit 1
 
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --preload --workers 2--threads 4 --timeout 60 app:app"]
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --preload --workers 2 --threads 4 --timeout 60 app:app"]
