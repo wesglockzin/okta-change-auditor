@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
 import requests
+from authlib.integrations.base_client import OAuthError
 from authlib.integrations.flask_client import OAuth
 from flask import (
     Flask,
@@ -21,61 +23,56 @@ from flask import (
 )
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from shared_http import make_session
+from config import (
+    ConfigError,
+    csv_set,
+    env_int,
+    is_user_allowed,
+    load_auth,
+    parse_orgs,
+    safe_next,
+    token_var,
+)
 from shared_docs import register_howto
+from shared_http import make_session
 
 APP_VERSION = "0.6.6"
 
 _session = make_session("ChangeAuditor", APP_VERSION)
 
-OKTA_URLS = {
-    "dev":  "https://host.example.com",
-    "stg":  "https://host.example.com",
-    "prod": "https://host.example.com",
-}
-
-TOKEN_VAR = {
-    "dev":  "OKTA_AUDITOR_DEV_API_TOKEN",
-    "stg":  "OKTA_AUDITOR_STG_API_TOKEN",
-    "prod": "OKTA_AUDITOR_PROD_API_TOKEN",
-}
+OKTA_URLS = parse_orgs(os.environ.get("OKTA_ORGS", ""))
+TOKEN_VAR = {name: token_var(name) for name in OKTA_URLS}
 
 KEYRING_SERVICE = "okta-change-auditor"
-OKTA_PAGE_LIMIT = 1000
-DEFAULT_CHANGE_LIMIT = 500
-MAX_CHANGE_LIMIT = 5000
-MAX_RAW_COLLAPSE_ROWS = 10000
-MAX_RAW_SCAN_EVENTS = 30000
-REQUEST_TIMEOUT_SECONDS = 30
+OKTA_PAGE_LIMIT = env_int(os.environ, "OKTA_PAGE_LIMIT", 1000, 1)
+DEFAULT_CHANGE_LIMIT = env_int(os.environ, "DEFAULT_CHANGE_LIMIT", 500, 1)
+MAX_CHANGE_LIMIT = env_int(os.environ, "MAX_CHANGE_LIMIT", 5000, 1)
+MAX_RAW_COLLAPSE_ROWS = env_int(os.environ, "MAX_RAW_COLLAPSE_ROWS", 10000, 1)
+MAX_RAW_SCAN_EVENTS = env_int(os.environ, "MAX_RAW_SCAN_EVENTS", 30000, 1)
+REQUEST_TIMEOUT_SECONDS = env_int(os.environ, "REQUEST_TIMEOUT_SECONDS", 30, 1)
+MAX_HOURS = env_int(os.environ, "MAX_HOURS", 24 * 90, 1)
 
 OKTA_429_MAX_RETRIES = 3
 OKTA_429_MAX_WAIT_SECONDS = 90
 OKTA_RATE_LIMIT_FLOOR = 5
 
 
-SYSTEM_ACTOR_ALTERNATE_IDS = {"system@okta.com"}
-
-AUTOMATION_UA_SUBSTRINGS: tuple[str, ...] = (
-    "azuqua",
-    "okta-",
-    "oktasync",
-    "workflows",
-    "okta integration",
-    "python-requests",
-    "go-resty",
-    "go-http-client",
-    "curl/",
-    "wget/",
-    "postmanruntime",
-    "apache-httpclient",
-    "java/",
-    "okhttp",
-    "node-fetch",
-    "axios",
+SYSTEM_ACTOR_ALTERNATE_IDS = set(
+    csv_set(os.environ.get("SYSTEM_ACTOR_ALTERNATE_IDS", "system@okta.com"))
 )
 
-SERVER_SIDE_AUTOMATION_UA_EXACT: tuple[str, ...] = (
-    "Azuqua",
+_DEFAULT_AUTOMATION_UA = (
+    "azuqua,okta-,oktasync,workflows,okta integration,python-requests,go-resty,"
+    "go-http-client,curl/,wget/,postmanruntime,apache-httpclient,java/,okhttp,"
+    "node-fetch,axios"
+)
+AUTOMATION_UA_SUBSTRINGS: tuple[str, ...] = tuple(
+    sorted(csv_set(os.environ.get("AUTOMATION_UA_SUBSTRINGS", _DEFAULT_AUTOMATION_UA)))
+)
+
+# Exact user-agent values excluded server-side (case kept: Okta compares exactly).
+SERVER_SIDE_AUTOMATION_UA_EXACT: tuple[str, ...] = tuple(
+    p.strip() for p in os.environ.get("SERVER_SIDE_AUTOMATION_UA_EXACT", "Azuqua").split(",") if p.strip()
 )
 
 
@@ -186,27 +183,32 @@ CHANGE_EVENT_FILTER: tuple[str, ...] = (
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+    stream=sys.stdout,
 )
 log = logging.getLogger("okta-change-auditor")
 
 try:
     import keyring
-except ImportError:
+    from keyring.errors import KeyringError
+except ImportError:  # the keyring is an optional extra
     keyring = None
+    KeyringError = RuntimeError
 
 
 def get_token(env: str) -> str:
+    """Environment variable first; the optional OS keyring is a fallback."""
     var = TOKEN_VAR.get(env)
     if not var:
         return ""
+    value = os.environ.get(var, "")
+    if value:
+        return value
     if keyring is not None:
         try:
-            kr = keyring.get_password(KEYRING_SERVICE, var)
-            if kr:
-                return kr
-        except Exception as e:
+            return keyring.get_password(KEYRING_SERVICE, var) or ""
+        except KeyringError as e:
             log.debug("keyring lookup failed for %s: %s", var, e)
-    return os.environ.get(var, "")
+    return ""
 
 
 def _build_event_filter(prefixes: Iterable[str]) -> str:
@@ -490,9 +492,14 @@ def _count_okta_events_by_prefix(
     while url and pages < page_cap:
         response = _okta_get_with_retry(_session, url, next_params, headers, env)
         if not response.ok:
+            log.warning(
+                "[%s] count request failed: HTTP %s %s",
+                env, response.status_code, response.text[:200].strip(),
+            )
             break
         events = response.json()
         if not isinstance(events, list):
+            log.warning("[%s] count request returned an unexpected payload", env)
             break
         count += len(events)
         link = _next_link(response.headers.get("Link"))
@@ -619,7 +626,7 @@ def _fetch_changes(
             n = fut.result(timeout=25)
             if n:
                 filtered[flag] = filtered.get(flag, 0) + n
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - a worker failure must not fail the request
             log.warning("prefix-hide count for %s failed: %s", flag, e)
 
     return {
@@ -630,22 +637,16 @@ def _fetch_changes(
     }
 
 
-FLASK_SECRET_KEY = os.environ.get("FLASK_SECRET_KEY") or os.urandom(32).hex()
-OIDC_ISSUER = os.environ.get("OIDC_ISSUER", "").rstrip("/")
-OIDC_CLIENT_ID = os.environ.get("OIDC_CLIENT_ID", "")
-OIDC_CLIENT_SECRET = os.environ.get("OIDC_CLIENT_SECRET", "")
-APP_BASE_URL = os.environ.get("APP_BASE_URL", "http://localhost:8080").rstrip("/")
+AUTH = load_auth(os.environ, os.urandom(32).hex())
+APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
 OIDC_SCOPES = "openid email profile"
-OIDC_ENABLED = bool(OIDC_ISSUER and OIDC_CLIENT_ID and OIDC_CLIENT_SECRET)
+OIDC_ENABLED = AUTH.oidc
 
 if not OIDC_ENABLED:
-    log.warning(
-        "OIDC is NOT configured — auth gate disabled, app is open. "
-        "Set OIDC_ISSUER / OIDC_CLIENT_ID / OIDC_CLIENT_SECRET to enable."
-    )
+    log.warning("AUTH_MODE=none: sign-in is disabled and every request is allowed.")
 
 app = Flask(__name__)
-app.secret_key = FLASK_SECRET_KEY
+app.secret_key = AUTH.secret_key
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = APP_BASE_URL.startswith("https://")
@@ -655,9 +656,9 @@ oauth = OAuth(app)
 if OIDC_ENABLED:
     oauth.register(
         name="okta",
-        client_id=OIDC_CLIENT_ID,
-        client_secret=OIDC_CLIENT_SECRET,
-        server_metadata_url=f"{OIDC_ISSUER}/.well-known/openid-configuration",
+        client_id=AUTH.client_id,
+        client_secret=AUTH.client_secret,
+        server_metadata_url=f"{AUTH.issuer}/.well-known/openid-configuration",
         client_kwargs={"scope": OIDC_SCOPES, "code_challenge_method": "S256"},
     )
 
@@ -706,22 +707,12 @@ LOGIN_HTML = """<!doctype html>
  a.btn{display:inline-block;background:#22c55e;color:#0f172a;text-decoration:none;padding:10px 22px;border-radius:8px;font-weight:600}
  a.btn:hover{background:#16a34a;color:#fff}
  .err{color:#fca5a5;font-size:12px;margin-top:16px}
- .vpn{background:#1f2937;border:1px solid #f59e0b;color:#fbbf24;font-size:13px;margin-top:20px;padding:12px 14px;border-radius:8px;text-align:left;line-height:1.5}
- .vpn b{color:#fde68a}
- .vpn .raw{display:block;color:#94a3b8;font-size:11px;margin-top:8px;font-family:ui-monospace,Menlo,monospace;word-break:break-word}
 </style></head><body><div class="card">
 <h1>Okta Change Auditor</h1>
 <p>Sign in with your work email to continue.</p>
 <a class="btn" href="/oidc/login">Sign in</a>
 {% if error %}
-  {% if 'access_denied' in error %}
-  <div class="vpn">
-    This app is restricted to the internal network. Connect to the VPN client, then click Sign in again.
-    <span class="raw">{{ error }}</span>
-  </div>
-  {% else %}
   <div class="err">{{ error }}</div>
-  {% endif %}
 {% endif %}
 </div></body></html>
 """
@@ -731,7 +722,7 @@ LOGIN_HTML = """<!doctype html>
 def login():
     if session.get("user"):
         return redirect(url_for("index"))
-    nxt = request.args.get("next")
+    nxt = safe_next(request.args.get("next"))
     if nxt:
         session["post_login_redirect"] = nxt
     err = session.pop("login_error", None)
@@ -754,17 +745,23 @@ def oidc_callback():
         return redirect(url_for("login"))
     try:
         token = oauth.okta.authorize_access_token()
-    except Exception as e:
-        session["login_error"] = f"token exchange failed: {e}"
+    except OAuthError:
+        log.exception("OIDC token exchange failed")
+        session["login_error"] = "Sign-in failed. Try again."
         return redirect(url_for("login"))
 
     claims = token.get("userinfo") or {}
+    email = claims.get("email") or claims.get("preferred_username")
+    if not is_user_allowed(email, AUTH):
+        log.warning("sign-in refused for %s: not on the allow-list", email)
+        session["login_error"] = "Your account is not allowed to use this app."
+        return redirect(url_for("login"))
     session["user"] = {
-        "email": claims.get("email") or claims.get("preferred_username"),
+        "email": email,
         "name": claims.get("name"),
         "login_time": datetime.now(timezone.utc).isoformat(),
     }
-    dest = session.pop("post_login_redirect", None) or url_for("index")
+    dest = safe_next(session.pop("post_login_redirect", None)) or url_for("index")
     return redirect(dest)
 
 
@@ -815,6 +812,8 @@ def api_changes():
             hours = int(request.args.get("hours", "24"))
         except ValueError:
             return jsonify(error="hours must be an integer"), 400
+        if not 1 <= hours <= MAX_HOURS:
+            return jsonify(error=f"hours must be between 1 and {MAX_HOURS}"), 400
         until = datetime.now(timezone.utc)
         since = until - timedelta(hours=hours)
 
@@ -835,9 +834,10 @@ def api_changes():
 
     try:
         result = _fetch_changes(env, since, until, limit=limit, hide_flags=hide_flags)
-    except Exception as e:
+    except (RuntimeError, requests.RequestException, ValueError):
+        # Details (status, body) go to the log; the client gets no raw text.
         log.exception("change fetch failed for %s", env)
-        return jsonify(error=str(e)), 500
+        return jsonify(error=f"could not fetch changes for {env}; see the server log"), 502
 
     return jsonify(
         env=env,
@@ -858,5 +858,8 @@ def api_flags():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8080"))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=env_int(os.environ, "PORT", 8080, 1),
+        debug=False,
+    )

@@ -1,25 +1,25 @@
 from __future__ import annotations
 
 import getpass
+import os
 import sys
+
+from config import parse_orgs, token_var
 
 try:
     import keyring
 except ImportError:
-    print("ERROR: 'keyring' package not installed.")
-    print("Run:  pip install keyring")
+    print("ERROR: the optional 'keyring' extra is not installed.")
+    print("Run:  pip install '.[keyring]'")
     sys.exit(1)
 
 KEYRING_SERVICE = "okta-change-auditor"
 
-TOKENS = [
-    ("OKTA_AUDITOR_DEV_API_TOKEN",  "DEV  (https://host.example.com)"),
-    ("OKTA_AUDITOR_STG_API_TOKEN",  "STG  (https://host.example.com)"),
-    ("OKTA_AUDITOR_PROD_API_TOKEN", "PROD (https://host.example.com)"),
-]
-
 
 def main() -> None:
+    orgs = parse_orgs(os.environ.get("OKTA_ORGS", ""))
+    TOKENS = [(token_var(name), f"{name} ({url})") for name, url in orgs.items()]
+
     print("\nOkta Change Auditor — Token Setup")
     print("=" * 42)
     print("Tokens will be stored in your OS credential store.")

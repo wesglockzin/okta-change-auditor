@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Plainly fake test value"
+regexes = ['''test-key-not-real''']

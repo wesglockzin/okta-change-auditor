@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "okta-change-auditor"
+version = "0.6.6"
+description = "Read-only web UI that shows who changed what in Okta, from the System Log."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+    "flask>=3.0,<4",
+    "gunicorn>=22,<24",
+    "requests>=2.32,<3",
+    "Authlib>=1.3,<2",
+    "markdown>=3.5,<4",
+]
+
+[project.optional-dependencies]
+keyring = ["keyring>=25,<26"]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.6",
+]
+
+[tool.setuptools]
+py-modules = ["app", "config", "shared_docs", "shared_http", "setup_tokens"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "BLE", "S110", "S112"]
