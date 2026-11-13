@@ -24,7 +24,7 @@ def test_index_renders_buttons_from_settings(client):
     assert 'data-env="alpha"' in html
     assert 'data-env="beta"' in html
     assert 'data-env="dev"' not in html
-    assert "let currentEnv = \"alpha\";" in html
+    assert 'let currentEnv = "alpha";' in html
 
 
 def test_unknown_env_and_bad_hours(client):
