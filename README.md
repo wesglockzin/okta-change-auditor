@@ -49,5 +49,4 @@ non-root user and reads `PORT`.
 - **Noise filtering is heuristic.** "Routine" events are hidden by event-type and actor
   rules; an unusual change made through an automated path can be hidden until you toggle
   "show everything".
-- **No lockfile yet**; dependencies have version ranges only.
 - **Pico CSS comes from a CDN**, so the UI is unstyled offline.

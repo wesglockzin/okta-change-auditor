@@ -34,7 +34,7 @@ pep621_dev_dependency_groups = ["dev"]
 DEP002 = ["gunicorn"]
 
 [tool.setuptools]
-py-modules = ["app", "config", "shared_docs", "shared_http", "setup_tokens"]
+py-modules = ["app", "config", "howto", "http_session", "setup_tokens"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -48,6 +48,16 @@ def test_fetch_error_does_not_leak_text(client, monkeypatch):
     assert "secret" not in response.get_data(as_text=True)
 
 
+def test_changes_defaults_to_first_configured_org(client, monkeypatch):
+    def fake(env, since, until, limit, hide_flags):
+        return {"rows": [], "filtered": 0, "truncated": False}
+
+    monkeypatch.setattr(auditor, "_fetch_changes", fake)
+    response = client.get("/api/changes")
+    assert response.status_code == 200
+    assert response.json["env"] == "alpha"
+
+
 def test_login_stores_only_safe_next(client):
     client.get("/login?next=//evil.test")
     with client.session_transaction() as sess:

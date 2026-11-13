@@ -32,8 +32,8 @@ from config import (
     safe_next,
     token_var,
 )
-from shared_docs import register_howto
-from shared_http import make_session
+from howto import register_howto
+from http_session import make_session
 
 APP_VERSION = "0.6.6"
 
